@@ -231,6 +231,7 @@ class PPOAgent(Agent):
             self.local_evaluator.filters, self.remote_evaluators)
         res = self._fetch_metrics_from_remote_evaluators()
         res = res._replace(info=info)
+        print('last tower weight', self.local_evaluator.get_weights()["tower/fc2/biases"][-1])
         return res
 
     def _fetch_metrics_from_remote_evaluators(self):
