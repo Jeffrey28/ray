@@ -5,7 +5,8 @@ from __future__ import print_function
 import tensorflow as tf
 
 from ray.rllib.models.model import Model
-from ray.rllib.models.fcnet import FullyConnectedNetwork
+from ray.rllib.models.fcnet import FullyConnectedNetwork, \
+    StaticFullyConnectedNetwork
 
 MODEL_CONFIGS = [
     # === Required options ===
@@ -19,8 +20,8 @@ MODEL_CONFIGS = [
     "fn_choose_subpolicy",
 ]
 
-
 NUM_SUBPOLICIES = 2
+
 
 class TwoLevelMixedNetwork(Model):
     """
@@ -33,16 +34,16 @@ class TwoLevelMixedNetwork(Model):
         pre_trained_weights = custom_options["pre_trained_weights"]
 
         # attention specified by the first observation
-        attention = tf.one_hot(inputs[0], NUM_SUBPOLICIES)
+        attention = tf.one_hot(inputs[0][0], NUM_SUBPOLICIES)
 
         outputs = []
         # pre-trained network
         with tf.variable_scope("multi{}".format(0)):
             sub_options = options.copy()
-            sub_options["is_static"] = True
             sub_options["static_weights"] = pre_trained_weights
-            subinput = inputs[1:]
-            fcnet = FullyConnectedNetwork(subinput, num_outputs, sub_options)
+            subinput = inputs[:, 1:]
+            fcnet = StaticFullyConnectedNetwork(
+                subinput, num_outputs, sub_options)
             output = fcnet.outputs
             rep_attention = tf.reshape(tf.tile(attention[:, 0],
                                       [num_outputs]),
@@ -53,7 +54,7 @@ class TwoLevelMixedNetwork(Model):
         with tf.variable_scope("multi{}".format(1)):
             sub_options = options.copy()
             sub_options.update({"fcnet_hiddens": trainable_hiddens})
-            subinput = inputs[1:]
+            subinput = inputs[:, 1:]
             fcnet = FullyConnectedNetwork(subinput, num_outputs, sub_options)
             output = fcnet.outputs
             rep_attention = tf.reshape(tf.tile(attention[:, 1],

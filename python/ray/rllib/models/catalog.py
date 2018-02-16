@@ -17,6 +17,7 @@ from ray.rllib.models.fcnet import FullyConnectedNetwork
 from ray.rllib.models.visionnet import VisionNetwork
 from ray.rllib.models.multiagentfcnet import MultiAgentFullyConnectedNetwork
 from ray.rllib.models.two_level_fcnet import TwoLevelFCNetwork
+from ray.rllib.models.two_level_mixed import TwoLevelMixedNetwork
 
 
 MODEL_CONFIGS = [
@@ -158,6 +159,10 @@ class ModelCatalog(object):
         if "hierarchical_fcnet_hiddens" in options.get("custom_options",
                                                        {}) and num_outputs > 1:
             return TwoLevelFCNetwork(inputs, num_outputs, options)
+
+        # used to train a network in the presence of a pre-trained policy
+        if "pre_trained_weights" in options.get("custom_options", {}):
+            return TwoLevelMixedNetwork(inputs, num_outputs, options)
 
         return FullyConnectedNetwork(inputs, num_outputs, options)
 

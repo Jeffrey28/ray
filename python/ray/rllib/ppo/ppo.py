@@ -274,6 +274,8 @@ class PPOAgent(Agent):
             self.kl_coeff,
             agent_state]
         pickle.dump(extra_data, open(checkpoint_path + ".extra_data", "wb"))
+        pickle.dump(self.local_evaluator.get_weights(),
+                    open(os.path.join(checkpoint_dir, "weights.pkl"), "wb"))
         return checkpoint_path
 
     def _restore(self, checkpoint_path):
