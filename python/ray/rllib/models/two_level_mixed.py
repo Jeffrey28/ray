@@ -34,8 +34,8 @@ class TwoLevelMixedNetwork(Model):
         pre_trained_weights = custom_options["pre_trained_weights"]
 
         # attention specified by the first observation
-        attention = tf.one_hot(inputs[0][0], NUM_SUBPOLICIES)
-
+        #attention = tf.one_hot(inputs[0][0], NUM_SUBPOLICIES)
+        attention = tf.one_hot(tf.cast(inputs[:, 0], tf.int32), 2)
         outputs = []
         # pre-trained network
         with tf.variable_scope("multi{}".format(0)):
@@ -48,6 +48,7 @@ class TwoLevelMixedNetwork(Model):
             rep_attention = tf.reshape(tf.tile(attention[:, 0],
                                       [num_outputs]),
                                       [-1, num_outputs])
+        tf.stop_gradient(output)
         outputs.append(rep_attention * output)
 
         # trainable network

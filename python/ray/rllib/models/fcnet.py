@@ -109,7 +109,7 @@ class StaticFullyConnectedNetwork(Model):
             for _ in range(2):  # FIXME: hack
                 label = "fc{}".format(i)
                 size = np.asarray(
-                    weights["tower/{}/weights".format(label)]).size
+                    weights["tower/{}/weights".format(label)]).shape[1]
                 last_layer = slim.fully_connected(
                     last_layer, size,
                     weights_initializer=tf.constant_initializer(np.asarray(
