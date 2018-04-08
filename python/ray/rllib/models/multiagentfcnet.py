@@ -6,14 +6,20 @@ import tensorflow as tf
 
 from ray.rllib.models.model import Model
 from ray.rllib.models.fcnet import FullyConnectedNetwork
+from ray.rllib.models.two_level_fcnet import TwoLevelFCNetwork
+from ray.rllib.models.fcnet import MODEL_CONFIGS as FCN_CONFIGS
+from ray.rllib.models.two_level_fcnet import MODEL_CONFIGS as TFCN_CONFIGS
 from ray.rllib.models.action_dist import Reshaper
+
+# TODO(cathywu) support more network types
+SUBMODEL_CONFIGS = {"FullyConnectedNetwork": FCN_CONFIGS,
+                 "TwoLevelFCNetwork": TFCN_CONFIGS}
 
 
 class MultiAgentFullyConnectedNetwork(Model):
     """Multiagent fully connected network."""
 
     def _init(self, inputs, num_outputs, options):
-
         # Split the input and output tensors
         custom_options = options["custom_options"]
         input_shapes = custom_options["multiagent_obs_shapes"]
@@ -23,21 +29,47 @@ class MultiAgentFullyConnectedNetwork(Model):
         split_inputs = input_reshaper.split_tensor(inputs)
         num_actions = output_reshaper.split_number(num_outputs)
 
+        custom_options = options["custom_options"]
         hiddens = custom_options.get("multiagent_fcnet_hiddens",
-                                     [[256, 256]]*1)
+                                     [[256, 256]] * 1)
+
+        network_cls = globals()[custom_options.get("network_type",
+                                                   "FullyConnectedNetwork")]
+        submodel_configs = SUBMODEL_CONFIGS[custom_options.get("network_type",
+                                                               "FullyConnectedNetwork")]
 
         # check for a shared model
-        shared_model = custom_options.get("multiagent_shared_model", 0)
+        shared_model = custom_options.get("is_shared_model", 0)
+        # the list indicates how many agents should share each model i.e.
+        # list [k1, k2, ...] indicates that first k1 agents share a model, then k2 share a model, etc.
+        shared_model_list = custom_options.get("shared_model_list", [len(hiddens)])
+
         reuse = tf.AUTO_REUSE if shared_model else False
         outputs = []
+        # keeps track of how many models we have set as shared so far
+        model_counter = 0
+        # keeps track of whether to move onto the next set of shared models
+        scope_counter = 0
         for i in range(len(hiddens)):
-            scope = "multi" if shared_model else "multi{}".format(i)
+            # change the scope when we're on a new shared model
+            scope = "multi{}".format(scope_counter) if shared_model else "multi{}".format(i)
+            model_counter += 1
+            if model_counter >= shared_model_list[scope_counter]:
+                scope_counter += 1
+                model_counter = 0
             with tf.variable_scope(scope, reuse=reuse):
                 sub_options = options.copy()
-                sub_options.update({"fcnet_hiddens": hiddens[i]})
-                # TODO(ev) make this support arbitrary networks
-                fcnet = FullyConnectedNetwork(
-                    split_inputs[i], int(num_actions[i]), sub_options)
+                for c in submodel_configs:
+                    if c in options:
+                        sub_options.update({c: options[c]})
+                    if c in custom_options:
+                        sub_options.update({c: custom_options[c]})
+                if "hierarchical_fcnet_hiddens" in sub_options:
+                    sub_options.update({"hierarchical_fcnet_hiddens": hiddens[i]})
+                else:
+                    sub_options.update({"fcnet_hiddens": hiddens[i]})
+                fcnet = network_cls(split_inputs[i], int(num_actions[i]),
+                                    sub_options)
                 output = fcnet.outputs
                 outputs.append(output)
         overall_output = tf.concat(outputs, axis=1)

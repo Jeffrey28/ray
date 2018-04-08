@@ -2,6 +2,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+# import cv2
+import gym
+import numpy as np
+
+from collections import deque
+from gym import spaces
+
 from ray.rllib.models import ModelCatalog
 from ray.rllib.utils.atari_wrappers import wrap_deepmind
 
